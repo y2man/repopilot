@@ -6,6 +6,7 @@ import App, { FileTree } from './App'
 afterEach(cleanup)
 
 beforeEach(() => {
+  sessionStorage.removeItem('rp-token')
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
@@ -40,6 +41,36 @@ describe('RepoPilot authentication screen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New to RepoPilot? Create an account' }))
     expect(screen.getByRole('heading', { name: 'Create your workspace.' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Create account' })).toBeTruthy()
+  })
+})
+
+describe('workspace navigation', () => {
+  it('removes the inert workspace card and lets the breadcrumb return to overview', async () => {
+    sessionStorage.setItem('rp-token', 'test-token')
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      const data = url.endsWith('/auth/me')
+        ? { id: 1, email: 'member@example.com' }
+        : url.endsWith('/auth/github/status')
+          ? { connected: false }
+          : url.endsWith('/health')
+            ? { status: 'ok', ai_configured: false }
+            : []
+      return { ok: true, status: 200, json: async () => data } as Response
+    }))
+
+    render(<App />)
+    const accountButton = await screen.findByRole('button', { name: 'View account settings' })
+    expect(accountButton.textContent).toContain('member@example.com')
+    expect(screen.queryByText('My workspace')).toBeNull()
+    expect(screen.queryByRole('button', { name: /api docs/i })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'View account settings' }))
+    expect(screen.getByText('Settings', { selector: 'strong' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Code Explorer' }))
+    expect(screen.getByText('Code Explorer', { selector: 'strong' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Go to overview' }))
+    expect(screen.getByText('Overview', { selector: 'strong' })).toBeTruthy()
   })
 })
 

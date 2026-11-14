@@ -131,6 +131,18 @@
 .audit-status.failed{background:rgba(255,112,130,.12);color:#ffb1bd}
 @media(max-width:900px){.settings-layout{grid-template-columns:1fr}}
 .brand-logo{width:132px;height:29px;object-fit:contain;object-position:left center}
+.sidebar{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(125,166,255,.25) transparent}
+.sidebar::-webkit-scrollbar{width:5px}
+.sidebar::-webkit-scrollbar-thumb{border-radius:8px;background:rgba(125,166,255,.25)}
+.sidebar-bottom{flex-shrink:0}
+.breadcrumb-home{padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer;transition:color .2s,background .2s,border-color .2s}
+.breadcrumb-home:hover{color:#dce9fc;background:rgba(135,168,220,.07);border-color:var(--line)}
+.breadcrumb-home:focus-visible{outline:2px solid #8fc5ff;outline-offset:3px}
+.account-button{display:flex;align-items:center;gap:8px;max-width:190px;padding:4px 9px;border:1px solid var(--line);border-radius:8px;background:rgba(145,174,218,.045);color:#c7d4e8;font-size:10px;cursor:pointer;transition:background .2s,border-color .2s}
+.account-button:hover{background:rgba(145,174,218,.1);border-color:#8db9f34d}
+.account-avatar{width:24px;height:24px;flex:none;display:grid;place-items:center;border-radius:50%;background:linear-gradient(140deg,#7d6db1,#3c5f91);color:#e5e9ff;font-size:10px;font-weight:700}
+.account-email{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:560px){.account-button{width:32px;height:32px;padding:0;justify-content:center}.account-email{display:none}}
 .settings-layout{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.2fr);gap:18px;align-items:start}
 .audit-event{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 0;border-bottom:1px solid rgba(125,166,255,.12);color:#dce8ff}
 .audit-event>div{display:flex;flex-direction:column;gap:4px}
