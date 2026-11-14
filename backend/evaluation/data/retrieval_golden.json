@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "description": "Small deterministic smoke benchmark for repository-code retrieval. Extend with reviewed, real-project judgments before using as a release quality gate.",
+  "documents": [
+    {"path":"auth/passwords.py","language":"Python","content":"def verify_password(plain_password, stored_hash):\n    return pbkdf2_hmac('sha256', plain_password.encode(), salt, rounds) == stored_hash\n\ndef hash_password(password):\n    return create_salted_pbkdf2_hash(password)"},
+    {"path":"auth/tokens.py","language":"Python","content":"def create_access_token(user_id):\n    return jwt.encode({'sub': str(user_id), 'exp': expires_at}, SECRET_KEY)\n\ndef decode_access_token(token):\n    return jwt.decode(token, SECRET_KEY, algorithms=['HS256'])"},
+    {"path":"database/session.py","language":"Python","content":"engine = create_engine(DATABASE_URL, pool_pre_ping=True)\nSessionLocal = sessionmaker(bind=engine, autoflush=False)\ndef get_db():\n    with SessionLocal() as session: yield session"},
+    {"path":"api/repositories.py","language":"Python","content":"def owned_repository(db, repository_id, user_id):\n    return db.scalar(select(Repository).where(Repository.id == repository_id, Repository.owner_id == user_id))"},
+    {"path":"ingestion/archive.py","language":"Python","content":"def safe_archive_path(name):\n    path = PurePosixPath(name)\n    return not path.is_absolute() and '..' not in path.parts\n\ndef ingest_zip(upload):\n    enforce_file_count_and_expanded_size_limits(upload)"},
+    {"path":"rag/retrieval.py","language":"Python","content":"def retrieve(question):\n    lexical = keyword_search(question)\n    semantic = pgvector_cosine_search(question)\n    return reciprocal_rank_fusion(lexical, semantic)"},
+    {"path":"jobs/indexing.py","language":"Python","content":"@celery_app.task\ndef reindex_repository(repository_id):\n    rebuild_symbols_and_code_chunks(repository_id)\n    update_indexing_job_progress(repository_id)"},
+    {"path":"api/chat.py","language":"Python","content":"async def stream_chat(question):\n    async for token in llm_stream(question):\n        yield ServerSentEvent(data=token)"}
+  ],
+  "queries": [
+    {"question":"How are passwords securely hashed and verified?", "relevant_paths":["auth/passwords.py"]},
+    {"question":"Where are JWT access tokens created and decoded?", "relevant_paths":["auth/tokens.py"]},
+    {"question":"Where is the SQLAlchemy database session configured?", "relevant_paths":["database/session.py"]},
+    {"question":"How does repository ownership authorization prevent cross-user access?", "relevant_paths":["api/repositories.py"]},
+    {"question":"How are ZIP path traversal and archive size limits handled?", "relevant_paths":["ingestion/archive.py"]},
+    {"question":"How does vector and keyword hybrid search combine ranked results?", "relevant_paths":["rag/retrieval.py"]},
+    {"question":"Which background job rebuilds repository code chunks and indexing progress?", "relevant_paths":["jobs/indexing.py"]},
+    {"question":"How are assistant tokens streamed over server sent events?", "relevant_paths":["api/chat.py"]}
+  ]
+}

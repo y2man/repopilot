@@ -1,0 +1,113 @@
+services:
+  # Build this image once before enabling the sandbox service:
+  # docker compose --profile sandbox-build build sandbox-image
+  sandbox-image:
+    profiles: ["sandbox-build"]
+    build:
+      context: ./sandbox
+      dockerfile: runner.Dockerfile
+    image: repopilot-test-python:3.12
+    command: ["true"]
+  sandbox:
+    profiles: ["local-sandbox"]
+    build: ./sandbox
+    environment:
+      SANDBOX_SHARED_SECRET: ${SANDBOX_SHARED_SECRET:-}
+      SANDBOX_RUNNER_IMAGE: repopilot-test-python:3.12
+    expose: ["8090"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 10s
+      timeout: 4s
+      retries: 10
+    restart: unless-stopped
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: repopilot
+      POSTGRES_USER: repopilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-repopilot-local-only}
+    expose: ["5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repopilot -d repopilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis_data:/data"]
+    expose: ["6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  api:
+    build:
+      context: ./backend
+      args:
+        INSTALL_LOCAL_EMBEDDINGS: ${INSTALL_LOCAL_EMBEDDINGS:-true}
+        RERANKER_ENABLED: ${RERANKER_ENABLED:-false}
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      SECRET_KEY: ${SECRET_KEY:-development-only-change-me}
+      DATABASE_URL: postgresql+psycopg://repopilot:${POSTGRES_PASSWORD:-repopilot-local-only}@db:5432/repopilot
+      REDIS_URL: redis://redis:6379/0
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      RERANKER_ENABLED: ${RERANKER_ENABLED:-false}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost}
+      SANDBOX_URL: ${SANDBOX_URL:-http://sandbox:8090}
+      SANDBOX_SHARED_SECRET: ${SANDBOX_SHARED_SECRET:-}
+      ALLOWED_HOSTS: '${ALLOWED_HOSTS:-["localhost","127.0.0.1"]}'
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-100}
+      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-365}
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost","http://localhost:5173"]}'
+    expose: ["8000"]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 4s
+      retries: 10
+  worker:
+    build:
+      context: ./backend
+      args:
+        INSTALL_LOCAL_EMBEDDINGS: ${INSTALL_LOCAL_EMBEDDINGS:-true}
+        RERANKER_ENABLED: ${RERANKER_ENABLED:-false}
+    command: ["celery", "-A", "app.core.celery_app.celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      SECRET_KEY: ${SECRET_KEY:-development-only-change-me}
+      DATABASE_URL: postgresql+psycopg://repopilot:${POSTGRES_PASSWORD:-repopilot-local-only}@db:5432/repopilot
+      REDIS_URL: redis://redis:6379/0
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      INSTALL_LOCAL_EMBEDDINGS: ${INSTALL_LOCAL_EMBEDDINGS:-false}
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  web:
+    build: ./frontend
+    ports: ["80:80"]
+    depends_on:
+      api: { condition: service_healthy }
+volumes:
+  postgres_data:
+  redis_data:

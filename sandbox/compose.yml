@@ -1,0 +1,26 @@
+services:
+  sandbox-image:
+    profiles: ["build"]
+    build:
+      context: .
+      dockerfile: runner.Dockerfile
+    image: repopilot-test-python:3.12
+    command: ["true"]
+  sandbox:
+    build: .
+    image: repopilot-sandbox-controller:1.0
+    environment:
+      SANDBOX_SHARED_SECRET: ${SANDBOX_SHARED_SECRET:?Set a unique SANDBOX_SHARED_SECRET}
+      SANDBOX_RUNNER_IMAGE: repopilot-test-python:3.12
+    ports:
+      - "${SANDBOX_BIND_ADDRESS:-127.0.0.1}:8090:8090"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 10s
+      timeout: 4s
+      retries: 10
+    restart: unless-stopped
