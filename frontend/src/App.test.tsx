@@ -45,7 +45,7 @@ describe('RepoPilot authentication screen', () => {
 })
 
 describe('workspace navigation', () => {
-  it('removes the inert workspace card and lets the breadcrumb return to overview', async () => {
+  it('opens AI Workspace from Overview and other sections, hiding the link on its destination', async () => {
     sessionStorage.setItem('rp-token', 'test-token')
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input)
@@ -62,7 +62,10 @@ describe('workspace navigation', () => {
     render(<App />)
     const accountButton = await screen.findByRole('button', { name: 'View account settings' })
     expect(accountButton.textContent).toContain('member@example.com')
-    expect(screen.queryByRole('button', { name: 'Go to overview' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Go to AI Workspace' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Go to AI Workspace' }))
+    expect(screen.getByText('AI Workspace', { selector: 'strong' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Go to AI Workspace' })).toBeNull()
     expect(screen.queryByText('My workspace')).toBeNull()
     expect(screen.queryByRole('button', { name: /api docs/i })).toBeNull()
 
@@ -70,10 +73,10 @@ describe('workspace navigation', () => {
     expect(screen.getByText('Settings', { selector: 'strong' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Code Explorer' }))
     expect(screen.getByText('Code Explorer', { selector: 'strong' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Go to overview' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Go to overview' }))
-    expect(screen.getByText('Overview', { selector: 'strong' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Go to overview' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Go to AI Workspace' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Go to AI Workspace' }))
+    expect(screen.getByText('AI Workspace', { selector: 'strong' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Go to AI Workspace' })).toBeNull()
   })
 })
 
