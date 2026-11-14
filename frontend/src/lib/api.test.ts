@@ -23,6 +23,13 @@ describe('request API client', () => {
     await expect(request('/api/v1/repositories/999', 'token')).rejects.toThrow('Repository not found')
   })
 
+  it('explains how to troubleshoot a network-level API failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    await expect(request('/api/v1/auth/login', null)).rejects.toThrow(
+      'Check the API URL, backend availability, and CORS settings.',
+    )
+  })
+
   it('handles 204 responses without attempting JSON parsing', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
     await expect(request<void>('/api/v1/repositories/1', 'token', { method: 'DELETE' })).resolves.toBeUndefined()

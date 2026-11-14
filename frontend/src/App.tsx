@@ -17,7 +17,7 @@ type Health = {status:string;database:string;redis:string;vector_store:string;ai
 type ChatMessage = { role:'user'|'assistant'; content:string; sources?:Source[] }
 type AuditEvent = {id:number;action:string;resource_type:string;resource_id:string;repository_id:number|null;status:string;details:Record<string,unknown>;created_at:string}
 type IndexJob = {id:number;status:string;progress:number;detail:string;created_at:string}
-const API = import.meta.env.VITE_API_URL || ''
+const API = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
 const nav: {label:Section;icon:typeof LayoutDashboard}[] = [
   {label:'Overview',icon:LayoutDashboard},{label:'Repositories',icon:FolderGit2},{label:'Repository Details',icon:FileText},{label:'Architecture',icon:Network},
   {label:'AI Workspace',icon:BrainCircuit},{label:'Code Explorer',icon:FileCode2},{label:'Search',icon:Search},
