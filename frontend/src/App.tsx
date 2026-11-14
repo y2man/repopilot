@@ -440,6 +440,75 @@ function LanguageChart({files}:{files:RepoFile[]}){
   return <div className="language-chart">{rows.length?rows.map(([name,count],i)=><div className="language-row" key={name}><span>{name}</span><div><motion.i initial={{width:0}} animate={{width:`${count/max*100}%`}} transition={{duration:.65,delay:i*.06,ease:'easeOut'}}/></div><b>{count}</b></div>):<p className="muted-empty">No indexed language data yet. Import a repository to populate this chart.</p>}</div>
 }
 
+function renderInlineText(text:string,keyPrefix:string):ReactNode[]{
+  const nodes:ReactNode[]=[]
+  const pattern=/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]\n]+:\d+(?:-\d+)?\])/g
+  let cursor=0;let match:RegExpExecArray|null;let index=0
+  while((match=pattern.exec(text))!==null){
+    if(match.index>cursor)nodes.push(text.slice(cursor,match.index))
+    const token=match[0]
+    const key=`${keyPrefix}-${index++}`
+    if(token.startsWith('**')){
+      nodes.push(<strong key={key}>{renderInlineText(token.slice(2,-2),key)}</strong>)
+    }else if(token.startsWith('`')){
+      nodes.push(<code className="message-inline-code" key={key}>{token.slice(1,-1)}</code>)
+    }else{
+      const citation=/^\[(.+):(\d+)(?:-(\d+))?\]$/.exec(token)
+      if(citation){
+        const path=citation[1]
+        const start=Number(citation[2])
+        const end=Number(citation[3]||citation[2])
+        nodes.push(<span className="inline-citation" key={key} title={`${path}:${start}-${end}`}>{path}:{start}{end===start?'':`-${end}`}</span>)
+      }else{
+        nodes.push(token)
+      }
+    }
+    cursor=pattern.lastIndex
+  }
+  if(cursor<text.length)nodes.push(text.slice(cursor))
+  return nodes
+}
+
+function renderMarkdownBlocks(text:string,keyPrefix:string):ReactNode[]{
+  const blocks:ReactNode[]=[]
+  let paragraph:string[]=[]
+  let listItems:string[]=[]
+  let orderedList=false
+  let key=0
+  const flushParagraph=()=>{
+    if(!paragraph.length)return
+    const content=paragraph.join('\n')
+    blocks.push(<p key={`${keyPrefix}-paragraph-${key}`}>{renderInlineText(content,`${keyPrefix}-paragraph-${key++}`)}</p>)
+    paragraph=[]
+  }
+  const flushList=()=>{
+    if(!listItems.length)return
+    const List=orderedList?'ol':'ul'
+    blocks.push(<List key={`${keyPrefix}-list-${key}`}>{listItems.map((item,index)=><li key={`${keyPrefix}-list-${key}-${index}`}>{renderInlineText(item,`${keyPrefix}-list-${key}-${index}`)}</li>)}</List>)
+    listItems=[]
+    key++
+  }
+  for(const line of text.split(/\r?\n/)){
+    const item=/^\s*(?:([-+*])|(\d+[.)]))\s+(.+)$/.exec(line)
+    if(item){
+      flushParagraph()
+      const nextOrdered=Boolean(item[2])
+      if(listItems.length&&orderedList!==nextOrdered)flushList()
+      orderedList=nextOrdered
+      listItems.push(item[3])
+    }else if(!line.trim()){
+      flushParagraph()
+      flushList()
+    }else{
+      flushList()
+      paragraph.push(line)
+    }
+  }
+  flushParagraph()
+  flushList()
+  return blocks.length?blocks:[<p key={`${keyPrefix}-empty`}>{text}</p>]
+}
+
 function MessageContent({content,onCopy}:{content:string;onCopy:(value:string)=>void}){
   const blocks:ReactNode[]=[]
   const pattern=/```([\w+-]*)\n([\s\S]*?)```/g
@@ -447,13 +516,13 @@ function MessageContent({content,onCopy}:{content:string;onCopy:(value:string)=>
   while((match=pattern.exec(content))!==null){
     const code=match[2];const language=match[1]||'CODE'
     const before=content.slice(cursor,match.index)
-    if(before.trim())blocks.push(<p key={`text-${key++}`}>{before}</p>)
+    if(before.trim())blocks.push(...renderMarkdownBlocks(before,`text-${key++}`))
     const codeLines=code.split('\n')
     blocks.push(<motion.div key={`code-${key++}`} className="message-code" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}}><div><span>{language}</span><button onClick={()=>onCopy(code)}><Copy size={12}/> Copy</button></div><pre><code>{codeLines.map((line,i)=><span className="highlighted-code-line" key={i}><SyntaxText text={line}/>{i<codeLines.length-1?'\n':''}</span>)}</code></pre></motion.div>)
     cursor=pattern.lastIndex
   }
   const tail=content.slice(cursor)
-  if(tail.trim())blocks.push(<p key={`text-${key++}`}>{tail}</p>)
+  if(tail.trim())blocks.push(...renderMarkdownBlocks(tail,`text-${key++}`))
   if(!blocks.length)blocks.push(<p key="empty">{content}</p>)
   return <div className="message-content">{blocks}</div>
 }

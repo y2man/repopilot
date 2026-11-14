@@ -134,6 +134,11 @@
 .sidebar{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(125,166,255,.25) transparent}
 .sidebar::-webkit-scrollbar{width:5px}
 .sidebar::-webkit-scrollbar-thumb{border-radius:8px;background:rgba(125,166,255,.25)}
+.message-content>ul,.message-content>ol{margin:0;padding-left:22px;color:#d1dced;font-size:12px;line-height:1.85}
+.message-content li+li{margin-top:5px}
+.message-content strong{color:#f0f5ff;font-weight:700}
+.message-inline-code{padding:1px 5px;border:1px solid rgba(133,171,230,.18);border-radius:4px;background:rgba(4,10,20,.65);color:#b9d6ff;font:10px/1.6 'DM Mono',monospace;overflow-wrap:anywhere}
+.inline-citation{display:inline;padding:1px 5px;border:1px solid rgba(125,166,255,.2);border-radius:5px;background:rgba(92,142,221,.1);color:#9cc8ff;font:10px/1.6 'DM Mono',monospace;overflow-wrap:anywhere}
 .sidebar-bottom{flex-shrink:0}
 .breadcrumb-home{padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer;transition:color .2s,background .2s,border-color .2s}
 .breadcrumb-home:hover{color:#dce9fc;background:rgba(135,168,220,.07);border-color:var(--line)}

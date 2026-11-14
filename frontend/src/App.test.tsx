@@ -96,7 +96,8 @@ describe('AI question submission', () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         const encoder = new TextEncoder()
-        controller.enqueue(encoder.encode('data: {"status":"generating","token":"Answer"}\n\n'))
+        const answer = '* **`goodreads-quotes-scraper/`** – contains the data file `temp.json` that stores the scraped quotes [projects/goodreads-quotes-scraper/temp.json:1]'
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token: answer })}\n\n`))
         controller.enqueue(encoder.encode('data: {"done":true,"conversation_id":9,"sources":[]}\n\n'))
         controller.close()
       },
@@ -137,6 +138,9 @@ describe('AI question submission', () => {
         question: 'How does authentication work?',
       })
     })
+    const answerItem = await screen.findByRole('listitem')
+    expect(answerItem.querySelector('strong code')?.textContent).toBe('goodreads-quotes-scraper/')
+    expect(answerItem.querySelector('.inline-citation')?.textContent).toBe('projects/goodreads-quotes-scraper/temp.json:1')
   })
 
   it('queues a question without a repository and sends it when one is selected', async () => {
