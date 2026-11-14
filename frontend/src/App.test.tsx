@@ -62,6 +62,7 @@ describe('workspace navigation', () => {
     render(<App />)
     const accountButton = await screen.findByRole('button', { name: 'View account settings' })
     expect(accountButton.textContent).toContain('member@example.com')
+    expect(screen.queryByRole('button', { name: 'Go to overview' })).toBeNull()
     expect(screen.queryByText('My workspace')).toBeNull()
     expect(screen.queryByRole('button', { name: /api docs/i })).toBeNull()
 
@@ -69,8 +70,10 @@ describe('workspace navigation', () => {
     expect(screen.getByText('Settings', { selector: 'strong' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Code Explorer' }))
     expect(screen.getByText('Code Explorer', { selector: 'strong' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Go to overview' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Go to overview' }))
     expect(screen.getByText('Overview', { selector: 'strong' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Go to overview' })).toBeNull()
   })
 })
 
