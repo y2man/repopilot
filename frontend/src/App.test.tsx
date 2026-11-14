@@ -96,7 +96,22 @@ describe('AI question submission', () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         const encoder = new TextEncoder()
-        const answer = '* **`goodreads-quotes-scraper/`** – contains the data file `temp.json` that stores the scraped quotes [projects/goodreads-quotes-scraper/temp.json:1]'
+        const answer = `### High-level architecture
+
+\`\`\`text
+┌ Front-end ── HTTP ── FastAPI back-end ┐
+└──────────────────────────────────────┘
+\`\`\`
+
+| Module | Purpose |
+| --- | --- |
+| API | Handles requests &amp; responses |
+
+* **\`goodreads-quotes-scraper/\`** – contains the data file \`temp.json\` that stores the scraped quotes [projects/goodreads-quotes-scraper/temp.json:1]
+
+Evidence: 【y2man-Python_practice/13_ai/models.py:1-61】
+
+---### Source details`
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token: answer })}\n\n`))
         controller.enqueue(encoder.encode('data: {"done":true,"conversation_id":9,"sources":[]}\n\n'))
         controller.close()
@@ -139,8 +154,13 @@ describe('AI question submission', () => {
       })
     })
     const answerItem = await screen.findByRole('listitem')
+    expect(screen.getByRole('heading', { name: 'High-level architecture' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Source details' })).toBeTruthy()
+    expect(screen.getByRole('table').textContent).toContain('Handles requests & responses')
+    expect(document.querySelector('.message-code pre')?.textContent).toContain('FastAPI back-end')
     expect(answerItem.querySelector('strong code')?.textContent).toBe('goodreads-quotes-scraper/')
-    expect(answerItem.querySelector('.inline-citation')?.textContent).toBe('projects/goodreads-quotes-scraper/temp.json:1')
+    expect(document.querySelectorAll('.inline-citation')).toHaveLength(2)
+    expect(document.querySelector('.inline-citation')?.textContent).toBe('projects/goodreads-quotes-scraper/temp.json:1')
   })
 
   it('queues a question without a repository and sends it when one is selected', async () => {

@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Children, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { request } from './lib/api'
 import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useSpring, useTransform } from 'framer-motion'
 import {
@@ -440,91 +442,54 @@ function LanguageChart({files}:{files:RepoFile[]}){
   return <div className="language-chart">{rows.length?rows.map(([name,count],i)=><div className="language-row" key={name}><span>{name}</span><div><motion.i initial={{width:0}} animate={{width:`${count/max*100}%`}} transition={{duration:.65,delay:i*.06,ease:'easeOut'}}/></div><b>{count}</b></div>):<p className="muted-empty">No indexed language data yet. Import a repository to populate this chart.</p>}</div>
 }
 
-function renderInlineText(text:string,keyPrefix:string):ReactNode[]{
-  const nodes:ReactNode[]=[]
-  const pattern=/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]\n]+:\d+(?:-\d+)?\])/g
-  let cursor=0;let match:RegExpExecArray|null;let index=0
-  while((match=pattern.exec(text))!==null){
-    if(match.index>cursor)nodes.push(text.slice(cursor,match.index))
-    const token=match[0]
-    const key=`${keyPrefix}-${index++}`
-    if(token.startsWith('**')){
-      nodes.push(<strong key={key}>{renderInlineText(token.slice(2,-2),key)}</strong>)
-    }else if(token.startsWith('`')){
-      nodes.push(<code className="message-inline-code" key={key}>{token.slice(1,-1)}</code>)
-    }else{
-      const citation=/^\[(.+):(\d+)(?:-(\d+))?\]$/.exec(token)
-      if(citation){
-        const path=citation[1]
-        const start=Number(citation[2])
-        const end=Number(citation[3]||citation[2])
-        nodes.push(<span className="inline-citation" key={key} title={`${path}:${start}-${end}`}>{path}:{start}{end===start?'':`-${end}`}</span>)
-      }else{
-        nodes.push(token)
-      }
-    }
-    cursor=pattern.lastIndex
-  }
-  if(cursor<text.length)nodes.push(text.slice(cursor))
-  return nodes
+type CitationReference = { label:string }
+
+function prepareMarkdown(content:string):{markdown:string;citations:CitationReference[]}{
+  const citations:CitationReference[]=[]
+  const citationPattern=/\[([^\]\n]+):(\d+)(?:-(\d+))?\]|【([^】\n]+):(\d+)(?:-(\d+))?】/g
+  const chunks=content.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g)
+  const markdown=chunks.map((chunk,index)=>{
+    if(index%2===1)return chunk
+    return chunk.replace(/---(?=#{1,6}\s)/g,'---\n\n').replace(citationPattern,(_match,squarePath:string|undefined,squareStart:string|undefined,squareEnd:string|undefined,widePath:string|undefined,wideStart:string|undefined,wideEnd:string|undefined)=>{
+      const path=squarePath||widePath||''
+      const start=squareStart||wideStart||''
+      const end=squareEnd||wideEnd
+      const label=`${path}:${start}${end?`-${end}`:''}`
+      const citationIndex=citations.push({label})-1
+      return `[${label.replace(/\]/g,'\\]')}](#rp-citation-${citationIndex})`
+    })
+  }).join('')
+  return {markdown,citations}
 }
 
-function renderMarkdownBlocks(text:string,keyPrefix:string):ReactNode[]{
-  const blocks:ReactNode[]=[]
-  let paragraph:string[]=[]
-  let listItems:string[]=[]
-  let orderedList=false
-  let key=0
-  const flushParagraph=()=>{
-    if(!paragraph.length)return
-    const content=paragraph.join('\n')
-    blocks.push(<p key={`${keyPrefix}-paragraph-${key}`}>{renderInlineText(content,`${keyPrefix}-paragraph-${key++}`)}</p>)
-    paragraph=[]
-  }
-  const flushList=()=>{
-    if(!listItems.length)return
-    const List=orderedList?'ol':'ul'
-    blocks.push(<List key={`${keyPrefix}-list-${key}`}>{listItems.map((item,index)=><li key={`${keyPrefix}-list-${key}-${index}`}>{renderInlineText(item,`${keyPrefix}-list-${key}-${index}`)}</li>)}</List>)
-    listItems=[]
-    key++
-  }
-  for(const line of text.split(/\r?\n/)){
-    const item=/^\s*(?:([-+*])|(\d+[.)]))\s+(.+)$/.exec(line)
-    if(item){
-      flushParagraph()
-      const nextOrdered=Boolean(item[2])
-      if(listItems.length&&orderedList!==nextOrdered)flushList()
-      orderedList=nextOrdered
-      listItems.push(item[3])
-    }else if(!line.trim()){
-      flushParagraph()
-      flushList()
-    }else{
-      flushList()
-      paragraph.push(line)
-    }
-  }
-  flushParagraph()
-  flushList()
-  return blocks.length?blocks:[<p key={`${keyPrefix}-empty`}>{text}</p>]
+function markdownText(node:ReactNode):string{
+  if(typeof node==='string'||typeof node==='number')return String(node)
+  if(Array.isArray(node))return node.map(markdownText).join('')
+  if(isValidElement<{children?:ReactNode}>(node))return markdownText(node.props.children)
+  return ''
 }
 
 function MessageContent({content,onCopy}:{content:string;onCopy:(value:string)=>void}){
-  const blocks:ReactNode[]=[]
-  const pattern=/```([\w+-]*)\n([\s\S]*?)```/g
-  let cursor=0;let match:RegExpExecArray|null;let key=0
-  while((match=pattern.exec(content))!==null){
-    const code=match[2];const language=match[1]||'CODE'
-    const before=content.slice(cursor,match.index)
-    if(before.trim())blocks.push(...renderMarkdownBlocks(before,`text-${key++}`))
-    const codeLines=code.split('\n')
-    blocks.push(<motion.div key={`code-${key++}`} className="message-code" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}}><div><span>{language}</span><button onClick={()=>onCopy(code)}><Copy size={12}/> Copy</button></div><pre><code>{codeLines.map((line,i)=><span className="highlighted-code-line" key={i}><SyntaxText text={line}/>{i<codeLines.length-1?'\n':''}</span>)}</code></pre></motion.div>)
-    cursor=pattern.lastIndex
+  const {markdown,citations}=prepareMarkdown(content)
+  const components:Components={
+    a:({href,children})=>{
+      const reference=href?.match(/^#rp-citation-(\d+)$/)
+      const citation=reference?citations[Number(reference[1])]:undefined
+      if(citation)return <span className="inline-citation" title={citation.label}>{citation.label}</span>
+      return <a href={href} target={href?.startsWith('http')?'_blank':undefined} rel={href?.startsWith('http')?'noreferrer':undefined}>{children}</a>
+    },
+    blockquote:({children})=><blockquote className="message-blockquote">{children}</blockquote>,
+    code:({children,className})=>className?<code className={className}>{children}</code>:<code className="message-inline-code">{children}</code>,
+    pre:({children})=>{
+      const codeNode=Children.toArray(children).find(node=>isValidElement(node))
+      const language=isValidElement<{className?:string}>(codeNode)?codeNode.props.className?.match(/language-([\w+-]+)/)?.[1]?.toUpperCase()||'CODE':'CODE'
+      const code=markdownText(children).replace(/\n$/,'')
+      const lines=code.split('\n')
+      return <motion.div className="message-code" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}}><div><span>{language}</span><button type="button" aria-label="Copy code block" onClick={()=>onCopy(code)}><Copy size={12}/> Copy</button></div><pre><code>{lines.map((line,index)=><span className="highlighted-code-line" key={index}><SyntaxText text={line}/>{index<lines.length-1?'\n':''}</span>)}</code></pre></motion.div>
+    },
+    table:({children})=><div className="message-table-wrap"><table>{children}</table></div>,
   }
-  const tail=content.slice(cursor)
-  if(tail.trim())blocks.push(...renderMarkdownBlocks(tail,`text-${key++}`))
-  if(!blocks.length)blocks.push(<p key="empty">{content}</p>)
-  return <div className="message-content">{blocks}</div>
+  return <div className="message-content"><ReactMarkdown components={components} remarkPlugins={[remarkGfm]} skipHtml>{markdown}</ReactMarkdown></div>
 }
 
 function ArchitecturePage({health,jobs,chatBusy,chatPhase}:{health:Health|null;jobs:IndexJob[];chatBusy:boolean;chatPhase:'retrieving'|'streaming'}){
